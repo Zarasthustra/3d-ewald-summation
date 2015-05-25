@@ -5,7 +5,7 @@ I have tried to implement the ewald summation code for 3d periodic system,using 
 
 I could also get Trace (virial) = E_coul * V correctly.
 
-Anyone can point out the missing details.
+Anyone can point out the missing details?
 Created a separate folder for testing and validation results
 
 Sumith YD
