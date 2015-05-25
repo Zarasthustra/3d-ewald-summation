@@ -8,5 +8,4 @@ I could also get Trace (virial) = E_coul * V correctly.
 Anyone can point out the missing details?
 Created a separate folder for testing and validation results
 
-Sumith YD
-ydsumith.weebly.com
+contact author @ ydsumith.weebly.com
