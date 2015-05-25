@@ -64,248 +64,42 @@ orion *atoms;
 //------------------------------------------------------------------
 int main()
 {
-    output<<"/******* Ewald summation program******/\n written by Sumith YD\n";
+    output<<"/******* Ewald summation program******/\n Authored by Sumith YD\n";
 
     define_physics();
     // Get the number of processors in this system
     int iCPU = omp_get_num_procs();
 
-// Now set the number of threads
-    omp_set_num_threads(iCPU);
+    // Now set the number of threads
+    omp_set_num_threads(iCPU); // not relevant now. may be for future.
 
-    if(build_geometry()) output<<"Geometry has builded"<<endl;
+    if(build_geometry()) output<<"Geometry has builded"<<endl; // read gro file with coordinates
 
-    find_COM();
+    find_COM(); // find center of mass
 
-    REAL_SPACE();
+    REAL_SPACE(); //real space contributions
     output<<"REAL ENERGY = "<<U_CR<<" [kJ/mol]"<<endl;
 
-    FOURIER_SPACE();
+    FOURIER_SPACE(); //reciprocal space
     output<<"K_SPACE ENERGY = "<<U_CF<<" [kJ/mol]"<<endl;
 
     SELF();
     output<<"SELF ENERGY = "<<U_CS<<" [kJ/mol]"<<endl;
 
-    DIPOLE();
+    DIPOLE(); //dipole contributions (if any)
     output<<"DIPOLE ENERGY = "<<U_CLR<<" [kJ/mol]"<<endl<<endl;
 
-    INTRA_MOL();
+    INTRA_MOL(); // correction for intra molecular forces
     output<<"INTRA ENERGY = "<<U_INTRA<<" [kJ/mol]"<<endl<<endl;
     output<<"K_SPACE+SELF = "<<U_CF+U_CS<<" [kJ/mol]"<<endl;
     output<<"TOTAL COUL ENERGY = "<<U_CF+U_CS+U_CR+U_INTRA<<" [kJ/mol]"<<endl;
 
-    DISP_FORCE();
+    DISP_FORCE(); // write results to a file
     output<<"Mission accomplished.."<<endl<<endl<<endl;
     output.close();
     return 0;
 }
-//---------------------------------------------------------------------------
-//
-//
-//---------------------------------------------------------------------------
-void INTRA_MOL()
-{
-    double rx, ry, rz, qi, qj;
-    double rsqr, r, tmp;
-    double KAPPA = 2*ALPHA/sqrt(M_PI);
-    double ALPSQR = ALPHA * ALPHA;
-    double FST;
-    //ONE_PI_EPS0 * 2* M_PI / box_VOL;
 
-    U_INTRA = 0;
-
-    for(int i = 0; i < N-1; i++)
-    {
-        for(int j = i+1; j < N; j++)
-        {
-            if(atoms[i].molecule == atoms[j].molecule) // same molecule
-            {
-                if(i != j) //skip same atom
-                {
-                    qi = atoms[i].charge;
-                    qj = atoms[j].charge;
-                    rx = atoms[i].x - atoms[j].x;
-                    ry = atoms[i].y - atoms[j].y;
-                    rz = atoms[i].z - atoms[j].z;
-                    rsqr = rx*rx + ry*ry + rz*rz;
-                    r = sqrt(rsqr);
-                    FST =erf(ALPHA*r);
-                    U_INTRA -= ONE_PI_EPS0*qi*qj*FST/r;
-                    tmp = ONE_PI_EPS0*qi*qj*(KAPPA*exp(-ALPSQR*rsqr)/rsqr - FST/(r*rsqr));
-                    Intra_force[i].x += tmp * rx;
-                    Intra_force[i].y += tmp * ry;
-                    Intra_force[i].z += tmp * rz;
-
-                    Intra_force[j].x -= tmp * rx;
-                    Intra_force[j].y -= tmp * ry;
-                    Intra_force[j].z -= tmp * rz;
-
-                    Vir_XX += tmp * rx * rx;
-                    Vir_YY += tmp * ry * ry;
-                    Vir_ZZ += tmp * rz * rz;
-                }
-            }
-        }
-    }
-}
-//---------------------------------------------------------------------------
-//
-//
-//---------------------------------------------------------------------------
-void DISP_FORCE()
-{
-    output<<endl<<"FORCE [kJ/mol/nm]"<<endl;
-    output<<"atom\tFX\tFY\tFZ "<<endl;
-    for(int i = 0; i < N; i++)
-    {
-        FORCE[i].x = R_force[i].x + K_force[i].x + Intra_force[i].x;
-        FORCE[i].y = R_force[i].y + K_force[i].y + Intra_force[i].y;
-        FORCE[i].z = R_force[i].z + K_force[i].z + Intra_force[i].z;
-    }
-    for(int i = 0; i < N; i++)
-        output<<i+1<<"\t"<<FORCE[i].x<<"\t"<<FORCE[i].y<<"\t"<<FORCE[i].z<<endl;
-
-    output<<endl<<"R_FORCE [kJ/mol/nm]"<<endl;
-    output<<"atom\tFX\tFY\tFZ "<<endl;
-    for(int i = 0; i < N; i++)
-        output<<i+1<<"\t"<<R_force[i].x<<"\t"<<R_force[i].y<<"\t"<<R_force[i].z<<endl;
-
-    output<<endl<<"K_FORCE [kJ/mol/nm]"<<endl;
-    output<<"atom\tFX\tFY\tFZ "<<endl;
-
-    for(int i = 0; i < N; i++)
-        output<<i+1<<"\t"<<K_force[i].x<<"\t"<<K_force[i].y<<"\t"<<K_force[i].z<<endl;
-
-    output<<endl<<"INT_FORCE [kJ/mol/nm]"<<endl;
-    output<<"atom\tFX\tFY\tFZ "<<endl;
-    for(int i = 0; i < N; i++)
-        output<<i+1<<"\t"<<Intra_force[i].x<<"\t"<<Intra_force[i].y<<"\t"<<Intra_force[i].z<<endl;
-
-    output<<endl<<"DIPOL_FORCE [kJ/mol/nm]"<<endl;
-    output<<"atom\tFX\tFY\tFZ "<<endl;
-    for(int i = 0; i < N; i++)
-        output<<i+1<<"\t"<<DIP_force[i].x<<"\t"<<DIP_force[i].y<<"\t"<<DIP_force[i].z<<endl;
-
-    virial_com();
-    output<<endl;
-    output<<endl;
-    output<<endl<<"VIRIAL [kJ/mol]"<<endl;
-    output<<"Vir-XX\tVir-YY\tVir-ZZ"<<endl;
-    output<<Vir_XX<<"\t"<<Vir_YY<<"\t"<<Vir_ZZ<<endl;
-    PXX = 16.6054 * Vir_XX / box_VOL;
-    PYY = 16.6054 * Vir_YY / box_VOL;
-    PZZ = 16.6054 * Vir_ZZ / box_VOL;
-    output<<endl<<"PRESSURE [bar]"<<endl;
-    output<<"PXX\tPYY\tPZZ"<<endl;
-    output<<PXX<<"\t"<<PYY<<"\t"<<PZZ<<endl;
-}
-//---------------------------------------------------------------------------
-//
-//
-//---------------------------------------------------------------------------
-void DIPOLE()
-{
-    double M_sqr, Mx, My, Mz;
-    double qi ;
-
-    U_CLR = 0;
-    M_sqr = Mx = My = Mz = 0;
-    for(int i = 0; i < N; i++)
-    {
-        qi = atoms[i].charge;
-        Mx += qi * atoms[i].x;
-        My += qi * atoms[i].y;
-        Mz += qi * atoms[i].z;
-    }
-    M_sqr = Mx*Mx + My*My + Mz*Mz;
-    U_CLR = ONE_PI_EPS0 * 2 * M_PI * M_sqr / (box_VOL*3);
-    for(int i = 0; i < N; i++)
-    {
-        qi = atoms[i].charge;
-        DIP_force[i].x -= ONE_PI_EPS0* qi * 4*M_PI * Mx / (3*box_VOL);
-        DIP_force[i].y -= ONE_PI_EPS0* qi * 4*M_PI * My / (3*box_VOL);
-        DIP_force[i].z -= ONE_PI_EPS0* qi * 4*M_PI * Mz / (3*box_VOL);
-        Vir_XX += ONE_PI_EPS0 * 2*M_PI*(M_sqr - 2*Mx*Mx)/(box_VOL*box_VOL*3);
-        Vir_YY += ONE_PI_EPS0 * 2*M_PI*(M_sqr - 2*My*My)/(box_VOL*box_VOL*3);
-        Vir_ZZ += ONE_PI_EPS0 * 2*M_PI*(M_sqr - 2*Mz*Mz)/(box_VOL*box_VOL*3);
-    }
-}
-//---------------------------------------------------------------------------
-//
-//
-//---------------------------------------------------------------------------
-void SELF()
-{
-    double SR_PI = -ALPHA/sqrt(M_PI);
-
-    U_CS = 0;
-    for(int i = 0; i < N; i++)
-    {
-        U_CS += atoms[i].charge * atoms[i].charge;
-    }
-    U_CS *= SR_PI * ONE_PI_EPS0;
-}
-//---------------------------------------------------------------------------
-//
-//
-//---------------------------------------------------------------------------
-void FOURIER_SPACE()
-{
-    complex<double> ak;
-    double ksqr, kdotr, qi, tmp, tmp2;
-    double a,b,akak, mx,my,mz, chak;
-    double GAMMA = -1/(4*ALPHA*ALPHA);
-    double recip = ONE_PI_EPS0 * 2* M_PI / box_VOL;
-    //output.open("DEBUG_details.xls");
-    //output<<"i\tkz\tmz\tqi\tkdotr\ttmp2\tforcez"<<endl;
-    U_CF = 0;
-
-    for(int kx = -kmax; kx <= kmax ; kx++)
-    {
-        mx = 2*M_PI*kx/L;
-        for(int ky = -kmax; ky <= kmax ; ky++)
-        {
-            my = 2*M_PI*ky/B;
-            for(int kz = -kmax; kz <= kmax ; kz++)
-            {
-                mz = 2*M_PI*kz/H;
-                ksqr = mx*mx + my*my + mz*mz;
-                if(ksqr != 0)
-                {
-                    ak.real() = 0;
-                    ak.imag() = 0;
-                    for(int i = 0; i < N; i++)
-                    {
-                        kdotr = mx*atoms[i].x + my*atoms[i].y + mz*atoms[i].z;
-                        qi = atoms[i].charge;
-                        ak.real() += qi*cos(kdotr);
-                        ak.imag() -= qi*sin(kdotr);
-                    }
-                    a = ak.real();
-                    b = ak.imag();
-                    akak = (a*a + b*b);
-                    tmp = recip * exp(GAMMA * ksqr)/ksqr;
-                    U_CF += tmp * akak;
-                    chak = (2/ksqr) - 2*GAMMA;
-                    Vir_XX += (1 - chak * mx*mx) *tmp * akak;
-                    Vir_YY += (1 - chak * my*my) *tmp * akak;
-                    Vir_ZZ += (1 - chak * mz*mz) *tmp * akak;
-                    for(int i = 0; i < N; i++)
-                    {
-                        kdotr = mx*atoms[i].x + my*atoms[i].y + mz*atoms[i].z;
-                        qi = atoms[i].charge;
-                        tmp2 = 2*tmp*qi*(sin(kdotr) * a + cos(kdotr) * b);
-                        K_force[i].x += tmp2 * mx;
-                        K_force[i].y += tmp2 * my;
-                        K_force[i].z += tmp2 * mz;
-                        //output<<setprecision(15)<<i<<"\t"<<kz<<"\t"<<mz<<"\t"<<qi<<"\t"<<kdotr<<"\t"<<tmp2<<"\t"<<tmp2*mz<<"\t"<<K_force[i].z<<endl;
-                    }
-                }
-            }
-        }
-    }
-    //output.close();
-}
 //---------------------------------------------------------------------------
 //
 //
@@ -356,6 +150,7 @@ void REAL_SPACE()
                                     R_force[j].y -= tmp * ry;
                                     R_force[j].z -= tmp * rz;
 
+                                    /********* virial *********/
                                     Vir_XX += tmp * rx* rx;
                                     Vir_YY += tmp * ry* ry;
                                     Vir_ZZ += tmp * rz* rz;
@@ -386,6 +181,7 @@ void REAL_SPACE()
                                 R_force[j].y -= tmp * RY;
                                 R_force[j].z -= tmp * RZ;
 
+                                /********* virial *********/
                                 Vir_XX += tmp * RX* RX;
                                 Vir_YY += tmp * RY* RY;
                                 Vir_ZZ += tmp * RZ* RZ;
@@ -397,6 +193,164 @@ void REAL_SPACE()
         }
     }
     output<<"done with real space"<<endl;
+}
+//---------------------------------------------------------------------------
+//
+//
+//---------------------------------------------------------------------------
+void FOURIER_SPACE()
+{
+    complex<double> ak;
+    double ksqr, kdotr, qi, tmp, tmp2;
+    double a,b,akak, mx,my,mz, chak;
+    double GAMMA = -1/(4*ALPHA*ALPHA);
+    double recip = ONE_PI_EPS0 * 2* M_PI / box_VOL;
+    //output.open("DEBUG_details.xls");
+    //output<<"i\tkz\tmz\tqi\tkdotr\ttmp2\tforcez"<<endl;
+    U_CF = 0;
+
+    for(int kx = -kmax; kx <= kmax ; kx++)
+    {
+        mx = 2*M_PI*kx/L;
+        for(int ky = -kmax; ky <= kmax ; ky++)
+        {
+            my = 2*M_PI*ky/B;
+            for(int kz = -kmax; kz <= kmax ; kz++)
+            {
+                mz = 2*M_PI*kz/H;
+                ksqr = mx*mx + my*my + mz*mz;
+                if(ksqr != 0)
+                {
+                    ak.real() = 0;
+                    ak.imag() = 0;
+                    for(int i = 0; i < N; i++)
+                    {
+                        kdotr = mx*atoms[i].x + my*atoms[i].y + mz*atoms[i].z;
+                        qi = atoms[i].charge;
+                        ak.real() += qi*cos(kdotr);
+                        ak.imag() -= qi*sin(kdotr);
+                    }
+                    a = ak.real();
+                    b = ak.imag();
+                    akak = (a*a + b*b);
+                    tmp = recip * exp(GAMMA * ksqr)/ksqr;
+                    U_CF += tmp * akak;
+                    chak = (2/ksqr) - 2*GAMMA;
+                    /********* virial *********/
+                    Vir_XX += (1 - chak * mx*mx) *tmp * akak;
+                    Vir_YY += (1 - chak * my*my) *tmp * akak;
+                    Vir_ZZ += (1 - chak * mz*mz) *tmp * akak;
+                    for(int i = 0; i < N; i++)
+                    {
+                        kdotr = mx*atoms[i].x + my*atoms[i].y + mz*atoms[i].z;
+                        qi = atoms[i].charge;
+                        tmp2 = 2*tmp*qi*(sin(kdotr) * a + cos(kdotr) * b);
+                        K_force[i].x += tmp2 * mx;
+                        K_force[i].y += tmp2 * my;
+                        K_force[i].z += tmp2 * mz;
+                        //output<<setprecision(15)<<i<<"\t"<<kz<<"\t"<<mz<<"\t"<<qi<<"\t"<<kdotr<<"\t"<<tmp2<<"\t"<<tmp2*mz<<"\t"<<K_force[i].z<<endl;
+                    }
+                }
+            }
+        }
+    }
+    //output.close();
+}
+//---------------------------------------------------------------------------
+//
+//
+//---------------------------------------------------------------------------
+void DIPOLE()
+{
+    double M_sqr, Mx, My, Mz;
+    double qi ;
+
+    U_CLR = 0;
+    M_sqr = Mx = My = Mz = 0;
+    for(int i = 0; i < N; i++)
+    {
+        qi = atoms[i].charge;
+        Mx += qi * atoms[i].x;
+        My += qi * atoms[i].y;
+        Mz += qi * atoms[i].z;
+    }
+    M_sqr = Mx*Mx + My*My + Mz*Mz;
+    U_CLR = ONE_PI_EPS0 * 2 * M_PI * M_sqr / (box_VOL*3);
+    for(int i = 0; i < N; i++)
+    {
+        qi = atoms[i].charge;
+        DIP_force[i].x -= ONE_PI_EPS0* qi * 4*M_PI * Mx / (3*box_VOL);
+        DIP_force[i].y -= ONE_PI_EPS0* qi * 4*M_PI * My / (3*box_VOL);
+        DIP_force[i].z -= ONE_PI_EPS0* qi * 4*M_PI * Mz / (3*box_VOL);
+        /********* virial *********/
+        Vir_XX += ONE_PI_EPS0 * 2*M_PI*(M_sqr - 2*Mx*Mx)/(box_VOL*box_VOL*3);
+        Vir_YY += ONE_PI_EPS0 * 2*M_PI*(M_sqr - 2*My*My)/(box_VOL*box_VOL*3);
+        Vir_ZZ += ONE_PI_EPS0 * 2*M_PI*(M_sqr - 2*Mz*Mz)/(box_VOL*box_VOL*3);
+    }
+}
+//---------------------------------------------------------------------------
+//
+//
+//---------------------------------------------------------------------------
+void SELF()
+{
+    double SR_PI = -ALPHA/sqrt(M_PI);
+
+    U_CS = 0;
+    for(int i = 0; i < N; i++)
+    {
+        U_CS += atoms[i].charge * atoms[i].charge;
+    }
+    U_CS *= SR_PI * ONE_PI_EPS0;
+}
+//---------------------------------------------------------------------------
+//
+//
+//---------------------------------------------------------------------------
+void INTRA_MOL()
+{
+    double rx, ry, rz, qi, qj;
+    double rsqr, r, tmp;
+    double KAPPA = 2*ALPHA/sqrt(M_PI);
+    double ALPSQR = ALPHA * ALPHA;
+    double FST;
+
+    U_INTRA = 0;
+
+    for(int i = 0; i < N-1; i++)
+    {
+        for(int j = i+1; j < N; j++)
+        {
+            if(atoms[i].molecule == atoms[j].molecule) // same molecule
+            {
+                if(i != j) //skip same atom
+                {
+                    qi = atoms[i].charge;
+                    qj = atoms[j].charge;
+                    rx = atoms[i].x - atoms[j].x;
+                    ry = atoms[i].y - atoms[j].y;
+                    rz = atoms[i].z - atoms[j].z;
+                    rsqr = rx*rx + ry*ry + rz*rz;
+                    r = sqrt(rsqr);
+                    FST =erf(ALPHA*r);
+                    U_INTRA -= ONE_PI_EPS0*qi*qj*FST/r;
+                    tmp = ONE_PI_EPS0*qi*qj*(KAPPA*exp(-ALPSQR*rsqr)/rsqr - FST/(r*rsqr));
+
+                    Intra_force[i].x += tmp * rx;
+                    Intra_force[i].y += tmp * ry;
+                    Intra_force[i].z += tmp * rz;
+
+                    Intra_force[j].x -= tmp * rx;
+                    Intra_force[j].y -= tmp * ry;
+                    Intra_force[j].z -= tmp * rz;
+                    /********* virial *********/
+                    Vir_XX += tmp * rx * rx;
+                    Vir_YY += tmp * ry * ry;
+                    Vir_ZZ += tmp * rz * rz;
+                }
+            }
+        }
+    }
 }
 //---------------------------------------------------------------------------
 //
@@ -414,11 +368,11 @@ bool build_geometry()
 {
     output.open("LOGFILE.txt");
     nmax = 5;
-    kmax = 13;
+    kmax = 13; //update for future
 
     read_water();
 
-    ALPHA = 1/0.313759;
+    ALPHA = 1/0.313759; // this has to be optimized based on cutoff
     box_VOL = L*B*H;
 
     for(int i = 0; i < N; i++)
@@ -558,16 +512,63 @@ void find_COM()
 //
 //
 //---------------------------------------------------------------------------
-void virial_com()
+void virial_com() //virial correction for rigid molecules
 {
-    //double virx, viry, virz;
-    //virx = viry = virz = 0;
     for(int i = 0; i < N; i++)
     {
-        Vir_XX += FORCE[i].x *(atoms[i].x - COM[i].x);
-        Vir_YY += FORCE[i].y *(atoms[i].y - COM[i].y);
-        Vir_ZZ += FORCE[i].z *(atoms[i].z - COM[i].z);
-        //output<<atoms[i].x<<","<<COM[i].x<<","<<FORCE[i].x <<","<<endl;
+        Vir_XX -= FORCE[i].x *(atoms[i].x - COM[i].x);
+        Vir_YY -= FORCE[i].y *(atoms[i].y - COM[i].y);
+        Vir_ZZ -= FORCE[i].z *(atoms[i].z - COM[i].z);
     }
-    //output<<"com_virial = "<<virx<<","<<viry<<","<<virz<<endl<<endl;
+}
+//---------------------------------------------------------------------------
+//
+//
+//---------------------------------------------------------------------------
+void DISP_FORCE()
+{
+    output<<endl<<"FORCE [kJ/mol/nm]"<<endl;
+    output<<"atom\tFX\tFY\tFZ "<<endl;
+    for(int i = 0; i < N; i++)
+    {
+        FORCE[i].x = R_force[i].x + K_force[i].x + Intra_force[i].x;
+        FORCE[i].y = R_force[i].y + K_force[i].y + Intra_force[i].y;
+        FORCE[i].z = R_force[i].z + K_force[i].z + Intra_force[i].z;
+    }
+    for(int i = 0; i < N; i++)
+        output<<i+1<<"\t"<<FORCE[i].x<<"\t"<<FORCE[i].y<<"\t"<<FORCE[i].z<<endl;
+
+    output<<endl<<"R_FORCE [kJ/mol/nm]"<<endl;
+    output<<"atom\tFX\tFY\tFZ "<<endl;
+    for(int i = 0; i < N; i++)
+        output<<i+1<<"\t"<<R_force[i].x<<"\t"<<R_force[i].y<<"\t"<<R_force[i].z<<endl;
+
+    output<<endl<<"K_FORCE [kJ/mol/nm]"<<endl;
+    output<<"atom\tFX\tFY\tFZ "<<endl;
+
+    for(int i = 0; i < N; i++)
+        output<<i+1<<"\t"<<K_force[i].x<<"\t"<<K_force[i].y<<"\t"<<K_force[i].z<<endl;
+
+    output<<endl<<"INT_FORCE [kJ/mol/nm]"<<endl;
+    output<<"atom\tFX\tFY\tFZ "<<endl;
+    for(int i = 0; i < N; i++)
+        output<<i+1<<"\t"<<Intra_force[i].x<<"\t"<<Intra_force[i].y<<"\t"<<Intra_force[i].z<<endl;
+
+    output<<endl<<"DIPOL_FORCE [kJ/mol/nm]"<<endl;
+    output<<"atom\tFX\tFY\tFZ "<<endl;
+    for(int i = 0; i < N; i++)
+        output<<i+1<<"\t"<<DIP_force[i].x<<"\t"<<DIP_force[i].y<<"\t"<<DIP_force[i].z<<endl;
+    /********* virial *********/
+    virial_com();
+    output<<endl;
+    output<<endl;
+    output<<endl<<"VIRIAL [kJ/mol]"<<endl;
+    output<<"Vir-XX\tVir-YY\tVir-ZZ"<<endl;
+    output<<Vir_XX<<"\t"<<Vir_YY<<"\t"<<Vir_ZZ<<endl;
+    PXX = 16.6054 * Vir_XX / box_VOL;
+    PYY = 16.6054 * Vir_YY / box_VOL;
+    PZZ = 16.6054 * Vir_ZZ / box_VOL;
+    output<<endl<<"PRESSURE [bar]"<<endl;
+    output<<"PXX\tPYY\tPZZ"<<endl;
+    output<<PXX<<"\t"<<PYY<<"\t"<<PZZ<<endl;
 }
