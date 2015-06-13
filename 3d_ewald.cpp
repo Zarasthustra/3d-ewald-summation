@@ -1,3 +1,8 @@
+/********************************************************
+ * All formulae taken from 
+ * Essmann, Ulrich, et al. "A smooth particle mesh Ewald method." 
+ * The Journal of chemical physics 103.19 (1995): 8577-8593.
+********************************************************/
 #include <iostream>
 #include <fstream>
 #include <cstdlib>
@@ -71,11 +76,11 @@ int main()
     int iCPU = omp_get_num_procs();
 
     // Now set the number of threads
-    omp_set_num_threads(iCPU); // not relevant now. may be for future.
+    omp_set_num_threads(iCPU); //--- not relevant now. may be for future.
 
     if(build_geometry()) output<<"Geometry has builded"<<endl; // read gro file with coordinates
 
-    find_COM(); // find center of mass
+    find_COM(); // find center of mass (optional)
 
     REAL_SPACE(); //real space contributions
     output<<"REAL ENERGY = "<<U_CR<<" [kJ/mol]"<<endl;
@@ -83,7 +88,7 @@ int main()
     FOURIER_SPACE(); //reciprocal space
     output<<"K_SPACE ENERGY = "<<U_CF<<" [kJ/mol]"<<endl;
 
-    SELF();
+    SELF(); //self energy
     output<<"SELF ENERGY = "<<U_CS<<" [kJ/mol]"<<endl;
 
     DIPOLE(); //dipole contributions (if any)
@@ -158,7 +163,7 @@ void REAL_SPACE()
                             }
                             else
                             {
-                                //ignore
+                                //ignore, because same molecule
                             }
                         }
                         else //image cells
