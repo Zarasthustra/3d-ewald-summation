@@ -5,7 +5,6 @@ This code is a non optimized implementation of the ewald summation code for 3d p
 
 I could also get Trace (virial) = E_coul * V correctly.
 
-Anyone can point out the missing details?
 Created a separate folder for testing and validation results
 
 All equations used here are kept in http://ydsumith.weebly.com/equations-706485.html
