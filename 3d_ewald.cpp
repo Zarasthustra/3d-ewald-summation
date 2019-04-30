@@ -322,37 +322,34 @@ void INTRA_MOL()
 
     U_INTRA = 0;
 
-    for(int i = 0; i < N-1; i++)
+    for(int i = 0; i < N-1; i++) // N is the number of atoms
     {
         for(int j = i+1; j < N; j++)
         {
             if(atoms[i].molecule == atoms[j].molecule) // same molecule
             {
-                if(i != j) //skip same atom
-                {
-                    qi = atoms[i].charge;
-                    qj = atoms[j].charge;
-                    rx = atoms[i].x - atoms[j].x;
-                    ry = atoms[i].y - atoms[j].y;
-                    rz = atoms[i].z - atoms[j].z;
-                    rsqr = rx*rx + ry*ry + rz*rz;
-                    r = sqrt(rsqr);
-                    FST =erf(ALPHA*r);
-                    U_INTRA -= ONE_PI_EPS0*qi*qj*FST/r;
-                    tmp = ONE_PI_EPS0*qi*qj*(KAPPA*exp(-ALPSQR*rsqr)/rsqr - FST/(r*rsqr));
+                qi = atoms[i].charge;
+                qj = atoms[j].charge;
+                rx = atoms[i].x - atoms[j].x;
+                ry = atoms[i].y - atoms[j].y;
+                rz = atoms[i].z - atoms[j].z;
+                rsqr = rx*rx + ry*ry + rz*rz;
+                r = sqrt(rsqr);
+                FST =erf(ALPHA*r);
+                U_INTRA -= ONE_PI_EPS0*qi*qj*FST/r;
+                tmp = ONE_PI_EPS0*qi*qj*(KAPPA*exp(-ALPSQR*rsqr)/rsqr - FST/(r*rsqr));
 
-                    Intra_force[i].x += tmp * rx;
-                    Intra_force[i].y += tmp * ry;
-                    Intra_force[i].z += tmp * rz;
+                Intra_force[i].x += tmp * rx;
+                Intra_force[i].y += tmp * ry;
+                Intra_force[i].z += tmp * rz;
 
-                    Intra_force[j].x -= tmp * rx;
-                    Intra_force[j].y -= tmp * ry;
-                    Intra_force[j].z -= tmp * rz;
-                    /********* virial *********/
-                    Vir_XX += tmp * rx * rx;
-                    Vir_YY += tmp * ry * ry;
-                    Vir_ZZ += tmp * rz * rz;
-                }
+                Intra_force[j].x -= tmp * rx;
+                Intra_force[j].y -= tmp * ry;
+                Intra_force[j].z -= tmp * rz;
+                /********* virial *********/
+                Vir_XX += tmp * rx * rx;
+                Vir_YY += tmp * ry * ry;
+                Vir_ZZ += tmp * rz * rz;
             }
         }
     }
